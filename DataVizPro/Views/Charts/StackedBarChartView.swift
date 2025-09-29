@@ -1,6 +1,15 @@
 import SwiftUI
 import Charts
 
+// 차트 데이터 구조체
+struct ChartDataItem: Identifiable {
+    let id = UUID()
+    let month: String
+    let category: String
+    let value: Double
+    let percentage: Double
+}
+
 struct StackedBarChartView: View {
     @EnvironmentObject var dataManager: DataManager
     @State private var selectedMonth: String?
@@ -15,8 +24,8 @@ struct StackedBarChartView: View {
     }
     
     // 카테고리별 월 데이터 집계
-    var aggregatedData: [(month: String, category: String, value: Double, percentage: Double)] {
-        var result: [(String, String, Double, Double)] = []
+    var aggregatedData: [ChartDataItem] {
+        var result: [ChartDataItem] = []
         
         let months = Array(Set(dataManager.salesData.map { $0.month })).sorted()
         let categories = Array(Set(dataManager.salesData.map { $0.category })).sorted()
@@ -32,7 +41,12 @@ struct StackedBarChartView: View {
                     .reduce(0, +)
                 let percentage = monthTotal > 0 ? (categoryValue / monthTotal) * 100 : 0
                 
-                result.append((month, category, categoryValue, percentage))
+                result.append(ChartDataItem(
+                    month: month,
+                    category: category,
+                    value: categoryValue,
+                    percentage: percentage
+                ))
             }
         }
         
@@ -42,108 +56,18 @@ struct StackedBarChartView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             // 헤더
-            VStack(alignment: .leading, spacing: 8) {
-                Text("누적 막대 차트")
-                    .font(.title2)
-                    .bold()
-                
-                HStack {
-                    Text("카테고리별 매출 분포")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                    
-                    Spacer()
-                    
-                    if let month = selectedMonth {
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text(month)
-                                .font(.caption)
-                                .bold()
-                            Text(formatTotal(for: month))
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.blue.opacity(0.1))
-                        .cornerRadius(6)
-                    }
-                }
-            }
-            .padding(.horizontal)
+            StackedBarHeader(
+                selectedMonth: selectedMonth,
+                formatTotal: formatTotal
+            )
             
             // 차트
-            Chart(aggregatedData) { item in
-                switch chartStyle {
-                case .stacked:
-                    BarMark(
-                        x: .value("월", item.month),
-                        y: .value("매출", item.value * animationProgress)
-                    )
-                    .foregroundStyle(by: .value("카테고리", item.category))
-                    .position(by: .value("카테고리", item.category))
-                    .cornerRadius(2)
-                    .opacity(selectedMonth == nil || selectedMonth == item.month ? 1.0 : 0.3)
-                    
-                case .grouped:
-                    BarMark(
-                        x: .value("월", item.month),
-                        y: .value("매출", item.value * animationProgress)
-                    )
-                    .foregroundStyle(by: .value("카테고리", item.category))
-                    .position(by: .value("카테고리", item.category), axis: .horizontal)
-                    .cornerRadius(3)
-                    .opacity(selectedMonth == nil || selectedMonth == item.month ? 1.0 : 0.3)
-                    
-                case .percentage:
-                    BarMark(
-                        x: .value("월", item.month),
-                        y: .value("비율", item.percentage * animationProgress)
-                    )
-                    .foregroundStyle(by: .value("카테고리", item.category))
-                    .position(by: .value("카테고리", item.category))
-                    .cornerRadius(2)
-                    .opacity(selectedMonth == nil || selectedMonth == item.month ? 1.0 : 0.3)
-                }
-                
-                // 선택된 월 강조
-                if selectedMonth == item.month {
-                    RuleMark(
-                        x: .value("선택", item.month)
-                    )
-                    .foregroundStyle(.gray.opacity(0.1))
-                    .offset(x: -20)
-                    .zIndex(-1)
-                }
-            }
-            .frame(height: 400)
-            .chartForegroundStyleScale([
-                "온라인": Color.blue,
-                "오프라인": Color.green,
-                "모바일": Color.orange
-            ])
-            .chartXSelection(value: .constant(selectedMonth))
-            .chartLegend(position: .top, alignment: .center, spacing: 20)
-            .chartYAxis {
-                AxisMarks { value in
-                    AxisValueLabel {
-                        if chartStyle == .percentage {
-                            if let intValue = value.as(Double.self) {
-                                Text("\(Int(intValue))%")
-                            }
-                        } else {
-                            if let intValue = value.as(Double.self) {
-                                Text("\(Int(intValue / 1000))K")
-                            }
-                        }
-                    }
-                    AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [5, 5]))
-                        .foregroundStyle(.gray.opacity(0.2))
-                }
-            }
-            .padding()
-            .background(Color.gray.opacity(0.05))
-            .cornerRadius(12)
+            StackedBarChartContent(
+                aggregatedData: aggregatedData,
+                chartStyle: chartStyle,
+                selectedMonth: $selectedMonth,
+                animationProgress: animationProgress
+            )
             .onAppear {
                 withAnimation(.easeOut(duration: 0.8)) {
                     animationProgress = 1.0
@@ -152,55 +76,21 @@ struct StackedBarChartView: View {
             
             // 카테고리별 합계 표시
             if let month = selectedMonth {
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                    ForEach(["온라인", "오프라인", "모바일"], id: \.self) { category in
-                        CategorySummaryCard(
-                            category: category,
-                            value: getCategoryValue(for: month, category: category),
-                            percentage: getCategoryPercentage(for: month, category: category),
-                            color: colorForCategory(category)
-                        )
-                    }
-                }
-                .padding(.horizontal)
+                CategorySummaryGrid(
+                    month: month,
+                    getCategoryValue: getCategoryValue,
+                    getCategoryPercentage: getCategoryPercentage
+                )
             }
             
             // 차트 스타일 선택
-            Picker("스타일", selection: $chartStyle) {
-                ForEach(ChartStyle.allCases, id: \.self) { style in
-                    Text(style.rawValue).tag(style)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-            .onChange(of: chartStyle) { _ in
-                animationProgress = 0
-                withAnimation(.easeOut(duration: 0.5)) {
-                    animationProgress = 1.0
-                }
-            }
+            ChartStylePicker(
+                chartStyle: $chartStyle,
+                animationProgress: $animationProgress
+            )
             
             // 월 선택
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    Button("전체") {
-                        withAnimation {
-                            selectedMonth = nil
-                        }
-                    }
-                    .buttonStyle(MonthButtonStyle(isSelected: selectedMonth == nil))
-                    
-                    ForEach(Array(Set(dataManager.salesData.map { $0.month })).sorted(), id: \.self) { month in
-                        Button(month) {
-                            withAnimation {
-                                selectedMonth = selectedMonth == month ? nil : month
-                            }
-                        }
-                        .buttonStyle(MonthButtonStyle(isSelected: selectedMonth == month))
-                    }
-                }
-            }
-            .padding(.horizontal)
+            MonthSelector(selectedMonth: $selectedMonth, salesData: dataManager.salesData)
             
             // 애니메이션 재생 버튼
             HStack {
@@ -241,6 +131,156 @@ struct StackedBarChartView: View {
             .reduce(0, +)
         return monthTotal > 0 ? (categoryValue / monthTotal) * 100 : 0
     }
+}
+
+// MARK: - Header Component
+struct StackedBarHeader: View {
+    let selectedMonth: String?
+    let formatTotal: (String) -> String
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("누적 막대 차트")
+                .font(.title2)
+                .bold()
+            
+            HStack {
+                Text("카테고리별 매출 분포")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                
+                Spacer()
+                
+                if let month = selectedMonth {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(month)
+                            .font(.caption)
+                            .bold()
+                        Text(formatTotal(month))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color.blue.opacity(0.1))
+                    .cornerRadius(6)
+                }
+            }
+        }
+        .padding(.horizontal)
+    }
+}
+
+// MARK: - Chart Content
+struct StackedBarChartContent: View {
+    let aggregatedData: [ChartDataItem]
+    let chartStyle: StackedBarChartView.ChartStyle
+    @Binding var selectedMonth: String?
+    let animationProgress: Double
+    
+    var body: some View {
+        Chart(aggregatedData) { item in
+            createBarMark(for: item)
+        }
+        .frame(height: 400)
+        .chartForegroundStyleScale([
+            "온라인": Color.blue,
+            "오프라인": Color.green,
+            "모바일": Color.orange
+        ])
+        .chartXSelection(value: $selectedMonth)
+        .chartLegend(position: .top, alignment: .center, spacing: 20)
+        .chartYAxis {
+            AxisMarks { value in
+                AxisValueLabel {
+                    if chartStyle == .percentage {
+                        if let intValue = value.as(Double.self) {
+                            Text("\(Int(intValue))%")
+                        }
+                    } else {
+                        if let intValue = value.as(Double.self) {
+                            Text("\(Int(intValue / 1000))K")
+                        }
+                    }
+                }
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [5, 5]))
+                    .foregroundStyle(.gray.opacity(0.2))
+            }
+        }
+        .padding()
+        .background(Color.gray.opacity(0.05))
+        .cornerRadius(12)
+    }
+    
+    @ChartContentBuilder
+    private func createBarMark(for item: ChartDataItem) -> some ChartContent {
+        switch chartStyle {
+        case .stacked:
+            BarMark(
+                x: .value("월", item.month),
+                y: .value("매출", item.value * animationProgress)
+            )
+            .foregroundStyle(by: .value("카테고리", item.category))
+            .position(by: .value("카테고리", item.category))
+            .cornerRadius(2)
+            .opacity(barOpacity(for: item.month))
+            
+        case .grouped:
+            BarMark(
+                x: .value("월", item.month),
+                y: .value("매출", item.value * animationProgress)
+            )
+            .foregroundStyle(by: .value("카테고리", item.category))
+            .position(by: .value("카테고리", item.category), axis: .horizontal)
+            .cornerRadius(3)
+            .opacity(barOpacity(for: item.month))
+            
+        case .percentage:
+            BarMark(
+                x: .value("월", item.month),
+                y: .value("비율", item.percentage * animationProgress)
+            )
+            .foregroundStyle(by: .value("카테고리", item.category))
+            .position(by: .value("카테고리", item.category))
+            .cornerRadius(2)
+            .opacity(barOpacity(for: item.month))
+        }
+        
+        // 선택된 월 강조
+        if selectedMonth == item.month {
+            RuleMark(
+                x: .value("선택", item.month)
+            )
+            .foregroundStyle(.gray.opacity(0.1))
+            .offset(x: -20)
+            .zIndex(-1)
+        }
+    }
+    
+    private func barOpacity(for month: String) -> Double {
+        selectedMonth == nil || selectedMonth == month ? 1.0 : 0.3
+    }
+}
+
+// MARK: - Category Summary Grid
+struct CategorySummaryGrid: View {
+    let month: String
+    let getCategoryValue: (String, String) -> Double
+    let getCategoryPercentage: (String, String) -> Double
+    
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+            ForEach(["온라인", "오프라인", "모바일"], id: \.self) { category in
+                CategorySummaryCard(
+                    category: category,
+                    value: getCategoryValue(month, category),
+                    percentage: getCategoryPercentage(month, category),
+                    color: colorForCategory(category)
+                )
+            }
+        }
+        .padding(.horizontal)
+    }
     
     private func colorForCategory(_ category: String) -> Color {
         switch category {
@@ -252,6 +292,62 @@ struct StackedBarChartView: View {
     }
 }
 
+// MARK: - Chart Style Picker
+struct ChartStylePicker: View {
+    @Binding var chartStyle: StackedBarChartView.ChartStyle
+    @Binding var animationProgress: Double
+    
+    var body: some View {
+        Picker("스타일", selection: $chartStyle) {
+            ForEach(StackedBarChartView.ChartStyle.allCases, id: \.self) { style in
+                Text(style.rawValue).tag(style)
+            }
+        }
+        .pickerStyle(.segmented)
+        .padding(.horizontal)
+        .onChange(of: chartStyle) { _ in
+            animationProgress = 0
+            withAnimation(.easeOut(duration: 0.5)) {
+                animationProgress = 1.0
+            }
+        }
+    }
+}
+
+// MARK: - Month Selector
+struct MonthSelector: View {
+    @Binding var selectedMonth: String?
+    let salesData: [SalesData]
+    
+    var months: [String] {
+        Array(Set(salesData.map { $0.month })).sorted()
+    }
+    
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                Button("전체") {
+                    withAnimation {
+                        selectedMonth = nil
+                    }
+                }
+                .buttonStyle(MonthButtonStyle(isSelected: selectedMonth == nil))
+                
+                ForEach(months, id: \.self) { month in
+                    Button(month) {
+                        withAnimation {
+                            selectedMonth = selectedMonth == month ? nil : month
+                        }
+                    }
+                    .buttonStyle(MonthButtonStyle(isSelected: selectedMonth == month))
+                }
+            }
+        }
+        .padding(.horizontal)
+    }
+}
+
+// MARK: - Supporting Views
 // 카테고리 요약 카드
 struct CategorySummaryCard: View {
     let category: String
