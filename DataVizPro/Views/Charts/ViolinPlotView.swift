@@ -69,7 +69,7 @@ struct ViolinPlotView: View {
         let bandwidth = 5.0
         var curve: [(Double, Double)] = []
         
-        for x in stride(from: 0, through: 100, by: 2) {
+        for x in stride(from: 0.0, through: 100.0, by: 2.0) {
             var density = 0.0
             for value in values {
                 let diff = (x - value) / bandwidth

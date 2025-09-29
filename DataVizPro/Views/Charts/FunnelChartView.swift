@@ -19,6 +19,29 @@ struct FunnelChartView: View {
         dataManager.funnelData.first?.value ?? 1
     }
     
+    // 평균 전환율 계산을 별도 프로퍼티로 분리
+    var averageConversionRate: Int {
+        let rates = dataManager.funnelData.compactMap { $0.conversionRate }
+        let sum = rates.reduce(0, +)
+        let count = Double(max(dataManager.funnelData.count, 1))
+        return Int((sum / count) * 100)
+    }
+    
+    // 전체 전환율 계산
+    var overallConversionRate: Int {
+        guard let firstValue = dataManager.funnelData.first?.value,
+              let lastValue = dataManager.funnelData.last?.value,
+              firstValue > 0 else { return 0 }
+        return Int((lastValue / firstValue) * 100)
+    }
+    
+    // 총 이탈값 계산
+    var totalDropoff: Int {
+        let firstValue = dataManager.funnelData.first?.value ?? 0
+        let lastValue = dataManager.funnelData.last?.value ?? 0
+        return Int(firstValue - lastValue)
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             // 헤더
@@ -34,22 +57,24 @@ struct FunnelChartView: View {
                 // 전체 전환율
                 if let firstValue = dataManager.funnelData.first?.value,
                    let lastValue = dataManager.funnelData.last?.value {
+                    let conversionRatio = lastValue / firstValue
+                    
                     HStack(spacing: 20) {
                         ConversionMetric(
                             label: "전체 전환율",
-                            value: "\(Int((lastValue / firstValue) * 100))%",
-                            trend: lastValue / firstValue > 0.1 ? .up : .down
+                            value: "\(overallConversionRate)%",
+                            trend: conversionRatio > 0.1 ? .up : .down
                         )
                         
                         ConversionMetric(
                             label: "총 이탈",
-                            value: "\(Int(firstValue - lastValue))",
+                            value: "\(totalDropoff)",
                             trend: .down
                         )
                         
                         ConversionMetric(
                             label: "평균 전환",
-                            value: "\(Int(dataManager.funnelData.compactMap { $0.conversionRate }.reduce(0, +) / Double(dataManager.funnelData.count) * 100))%",
+                            value: "\(averageConversionRate)%",
                             trend: .neutral
                         )
                     }
