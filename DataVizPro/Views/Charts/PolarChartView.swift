@@ -14,34 +14,42 @@ struct PolarChartView: View {
         let categories = ["패턴 A", "패턴 B", "패턴 C"]
         let colors = [Color.blue, Color.purple, Color.orange]
         
+        // stride를 먼저 Array로 변환
+        let angles: [Double] = Array(stride(from: 0.0, to: 360.0, by: 5.0))
+        
         for (index, category) in categories.enumerated() {
-            for angle in stride(from: 0.0, to: 360.0, by: 5.0) {
-                let radian = angle * .pi / 180
+            let categoryColor = colors[index]
+            
+            for angle in angles {
+                let radius = calculateRadius(for: angle, categoryIndex: index)
                 
-                // 각 카테고리별 다른 패턴
-                let radius: Double
-                switch index {
-                case 0: // 꽃잎 패턴
-                    radius = 50 + 30 * sin(4 * radian)
-                case 1: // 나선형
-                    radius = 30 + Double(angle) / 5
-                case 2: // 심장 모양
-                    let t = radian
-                    radius = 40 * (1 + sin(t))
-                default:
-                    radius = 50
-                }
-                
-                data.append(PolarData(
-                    angle: Double(angle),
+                let polarPoint = PolarData(
+                    angle: angle,
                     radius: max(0, radius),
                     category: category,
-                    color: colors[index]
-                ))
+                    color: categoryColor
+                )
+                data.append(polarPoint)
             }
         }
         
         return data
+    }
+    
+    // 별도 함수로 반경 계산 분리
+    private func calculateRadius(for angle: Double, categoryIndex: Int) -> Double {
+        let radian = angle * .pi / 180
+        
+        switch categoryIndex {
+        case 0: // 꽃잎 패턴
+            return 50 + 30 * sin(4 * radian)
+        case 1: // 나선형
+            return 30 + angle / 5
+        case 2: // 심장 모양
+            return 40 * (1 + sin(radian))
+        default:
+            return 50
+        }
     }
     
     var body: some View {
@@ -75,7 +83,9 @@ struct PolarChartView: View {
             
             // 극좌표 차트
             GeometryReader { geometry in
-                let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
+                let centerX = geometry.size.width / 2
+                let centerY = geometry.size.height / 2
+                let center = CGPoint(x: centerX, y: centerY)
                 let maxRadius = min(geometry.size.width, geometry.size.height) / 2 - 40
                 
                 ZStack {
@@ -84,74 +94,16 @@ struct PolarChartView: View {
                         PolarGrid(center: center, maxRadius: maxRadius)
                     }
                     
-                    // 데이터 포인트/영역
-                    ForEach(["패턴 A", "패턴 B", "패턴 C"], id: \.self) { category in
-                        let categoryData = polarData.filter { $0.category == category }
-                        
-                        if showArea {
-                            // 영역 채우기
-                            Path { path in
-                                for (index, point) in categoryData.enumerated() {
-                                    let angle = (point.angle + rotationAngle) * .pi / 180
-                                    let r = point.radius * maxRadius / 100 * animationProgress
-                                    let x = center.x + cos(angle) * r
-                                    let y = center.y + sin(angle) * r
-                                    
-                                    if index == 0 {
-                                        path.move(to: CGPoint(x: x, y: y))
-                                    } else {
-                                        path.addLine(to: CGPoint(x: x, y: y))
-                                    }
-                                }
-                                path.closeSubpath()
-                            }
-                            .fill(categoryData.first?.color.opacity(0.3) ?? .clear)
-                        }
-                        
-                        // 선 그리기
-                        Path { path in
-                            for (index, point) in categoryData.enumerated() {
-                                let angle = (point.angle + rotationAngle) * .pi / 180
-                                let r = point.radius * maxRadius / 100 * animationProgress
-                                let x = center.x + cos(angle) * r
-                                let y = center.y + sin(angle) * r
-                                
-                                if index == 0 {
-                                    path.move(to: CGPoint(x: x, y: y))
-                                } else {
-                                    path.addLine(to: CGPoint(x: x, y: y))
-                                }
-                            }
-                            if !categoryData.isEmpty {
-                                // 마지막 점과 첫 점 연결
-                                let firstPoint = categoryData[0]
-                                let angle = (firstPoint.angle + rotationAngle) * .pi / 180
-                                let r = firstPoint.radius * maxRadius / 100 * animationProgress
-                                let x = center.x + cos(angle) * r
-                                let y = center.y + sin(angle) * r
-                                path.addLine(to: CGPoint(x: x, y: y))
-                            }
-                        }
-                        .stroke(categoryData.first?.color ?? .clear, lineWidth: 2)
-                        
-                        // 데이터 포인트
-                        ForEach(categoryData.filter { Int($0.angle) % 15 == 0 }) { point in
-                            let angle = (point.angle + rotationAngle) * .pi / 180
-                            let r = point.radius * maxRadius / 100 * animationProgress
-                            let x = center.x + cos(angle) * r
-                            let y = center.y + sin(angle) * r
-                            
-                            Circle()
-                                .fill(point.color)
-                                .frame(width: 6, height: 6)
-                                .position(x: x, y: y)
-                                .onTapGesture {
-                                    withAnimation {
-                                        selectedPoint = point
-                                    }
-                                }
-                        }
-                    }
+                    // 데이터 포인트/영역 - 미리 계산된 카테고리별로 그룹화
+                    PolarDataView(
+                        polarData: polarData,
+                        center: center,
+                        maxRadius: maxRadius,
+                        showArea: showArea,
+                        rotationAngle: rotationAngle,
+                        animationProgress: animationProgress,
+                        selectedPoint: $selectedPoint
+                    )
                     
                     // 중심점
                     Circle()
@@ -230,6 +182,167 @@ struct PolarChartView: View {
     }
 }
 
+// 데이터 렌더링을 위한 별도 뷰
+struct PolarDataView: View {
+    let polarData: [PolarData]
+    let center: CGPoint
+    let maxRadius: CGFloat
+    let showArea: Bool
+    let rotationAngle: Double
+    let animationProgress: Double
+    @Binding var selectedPoint: PolarData?
+    
+    // 카테고리별로 그룹화된 데이터
+    var groupedData: [String: [PolarData]] {
+        Dictionary(grouping: polarData, by: { $0.category })
+    }
+    
+    var body: some View {
+        ForEach(["패턴 A", "패턴 B", "패턴 C"], id: \.self) { category in
+            if let categoryData = groupedData[category] {
+                ZStack {
+                    if showArea {
+                        // 영역 채우기
+                        PolarAreaPath(
+                            data: categoryData,
+                            center: center,
+                            maxRadius: maxRadius,
+                            rotationAngle: rotationAngle,
+                            animationProgress: animationProgress
+                        )
+                        .fill(categoryData.first?.color.opacity(0.3) ?? .clear)
+                    }
+                    
+                    // 선 그리기
+                    PolarLinePath(
+                        data: categoryData,
+                        center: center,
+                        maxRadius: maxRadius,
+                        rotationAngle: rotationAngle,
+                        animationProgress: animationProgress
+                    )
+                    .stroke(categoryData.first?.color ?? .clear, lineWidth: 2)
+                    
+                    // 데이터 포인트
+                    ForEach(categoryData.filter { Int($0.angle) % 15 == 0 }) { point in
+                        PolarPointView(
+                            point: point,
+                            center: center,
+                            maxRadius: maxRadius,
+                            rotationAngle: rotationAngle,
+                            animationProgress: animationProgress
+                        )
+                        .onTapGesture {
+                            withAnimation {
+                                selectedPoint = point
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// 영역 Path 생성
+struct PolarAreaPath: Shape {
+    let data: [PolarData]
+    let center: CGPoint
+    let maxRadius: CGFloat
+    let rotationAngle: Double
+    let animationProgress: Double
+    
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        
+        for (index, point) in data.enumerated() {
+            let coords = calculateCoordinates(for: point)
+            
+            if index == 0 {
+                path.move(to: coords)
+            } else {
+                path.addLine(to: coords)
+            }
+        }
+        path.closeSubpath()
+        return path
+    }
+    
+    private func calculateCoordinates(for point: PolarData) -> CGPoint {
+        let angle = (point.angle + rotationAngle) * .pi / 180
+        let r = point.radius * maxRadius / 100 * animationProgress
+        return CGPoint(
+            x: center.x + cos(angle) * r,
+            y: center.y + sin(angle) * r
+        )
+    }
+}
+
+// 선 Path 생성
+struct PolarLinePath: Shape {
+    let data: [PolarData]
+    let center: CGPoint
+    let maxRadius: CGFloat
+    let rotationAngle: Double
+    let animationProgress: Double
+    
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        
+        for (index, point) in data.enumerated() {
+            let coords = calculateCoordinates(for: point)
+            
+            if index == 0 {
+                path.move(to: coords)
+            } else {
+                path.addLine(to: coords)
+            }
+        }
+        
+        // 마지막 점과 첫 점 연결
+        if let firstPoint = data.first {
+            let coords = calculateCoordinates(for: firstPoint)
+            path.addLine(to: coords)
+        }
+        
+        return path
+    }
+    
+    private func calculateCoordinates(for point: PolarData) -> CGPoint {
+        let angle = (point.angle + rotationAngle) * .pi / 180
+        let r = point.radius * maxRadius / 100 * animationProgress
+        return CGPoint(
+            x: center.x + cos(angle) * r,
+            y: center.y + sin(angle) * r
+        )
+    }
+}
+
+// 데이터 포인트 뷰
+struct PolarPointView: View {
+    let point: PolarData
+    let center: CGPoint
+    let maxRadius: CGFloat
+    let rotationAngle: Double
+    let animationProgress: Double
+    
+    var position: CGPoint {
+        let angle = (point.angle + rotationAngle) * .pi / 180
+        let r = point.radius * maxRadius / 100 * animationProgress
+        return CGPoint(
+            x: center.x + cos(angle) * r,
+            y: center.y + sin(angle) * r
+        )
+    }
+    
+    var body: some View {
+        Circle()
+            .fill(point.color)
+            .frame(width: 6, height: 6)
+            .position(position)
+    }
+}
+
 // 극좌표 그리드
 struct PolarGrid: View {
     let center: CGPoint
@@ -263,8 +376,10 @@ struct PolarGrid: View {
             }
             
             // 방사선
-            for angle in stride(from: 0, to: 360, by: 30) {
-                let radian = CGFloat(angle) * .pi / 180
+            let angles: [Int] = Array(stride(from: 0, to: 360, by: 30))
+            for angle in angles {
+                let angleDouble = CGFloat(angle)
+                let radian = angleDouble * .pi / 180
                 let x = center.x + cos(radian) * maxRadius
                 let y = center.y + sin(radian) * maxRadius
                 
