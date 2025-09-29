@@ -23,41 +23,51 @@ struct BubbleChartView: View {
         return dataManager.bubbleData
     }
     
+    // 분리된 계산 프로퍼티
+    var headerView: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("버블 차트")
+                .font(.title2)
+                .bold()
+            
+            Text("다차원 데이터 시각화")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+            
+            // 호버된 버블 정보
+            if let bubble = hoveredBubble {
+                hoveredBubbleInfo(bubble: bubble)
+            }
+        }
+        .padding(.horizontal)
+    }
+    
+    @ViewBuilder
+    func hoveredBubbleInfo(bubble: BubbleData) -> some View {
+        HStack(spacing: 20) {
+            Label(bubble.label, systemImage: "circle.fill")
+                .foregroundColor(bubble.color)
+            
+            HStack(spacing: 15) {
+                InfoBadge(label: "X", value: String(format: "%.1f", bubble.x))
+                InfoBadge(label: "Y", value: String(format: "%.1f", bubble.y))
+                InfoBadge(label: "크기", value: String(format: "%.1f", bubble.size))
+                InfoBadge(
+                    label: "성장",
+                    value: String(format: "%+.1f%%", bubble.growth),
+                    color: bubble.growth > 0 ? .green : .red
+                )
+            }
+        }
+        .padding(12)
+        .background(Color.gray.opacity(0.1))
+        .cornerRadius(8)
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             // 헤더
-            VStack(alignment: .leading, spacing: 8) {
-                Text("버블 차트")
-                    .font(.title2)
-                    .bold()
-                
-                Text("다차원 데이터 시각화")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                
-                // 호버된 버블 정보
-                if let bubble = hoveredBubble {
-                    HStack(spacing: 20) {
-                        Label(bubble.label, systemImage: "circle.fill")
-                            .foregroundColor(bubble.color)
-                        
-                        HStack(spacing: 15) {
-                            InfoBadge(label: "X", value: String(format: "%.1f", bubble.x))
-                            InfoBadge(label: "Y", value: String(format: "%.1f", bubble.y))
-                            InfoBadge(label: "크기", value: String(format: "%.1f", bubble.size))
-                            InfoBadge(
-                                label: "성장",
-                                value: String(format: "%+.1f%%", bubble.growth),
-                                color: bubble.growth > 0 ? .green : .red
-                            )
-                        }
-                    }
-                    .padding(12)
-                    .background(Color.gray.opacity(0.1))
-                    .cornerRadius(8)
-                }
-            }
-            .padding(.horizontal)
+            headerView
             
             // 버블 차트
             ZStack {

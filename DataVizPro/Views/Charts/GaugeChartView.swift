@@ -382,48 +382,30 @@ struct SpeedometerGaugeView: View {
     let max: Double
     let currentValue: Double
     
+    // 계산된 프로퍼티로 분리
+    var needleAngle: Double {
+        -90 + value * 180
+    }
+    
+    var needleRadian: Double {
+        needleAngle * .pi / 180
+    }
+    
+    var needleColor: Color {
+        thresholds.last(where: { currentValue >= $0.value })?.color ?? .blue
+    }
+    
     var body: some View {
         GeometryReader { geometry in
             let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height * 0.8)
+            let baseRadius = geometry.size.width / 2
             
             ZStack {
-                // 눈금
-                ForEach(0..<11, id: \.self) { tick in
-                    let angle = Double(tick) / 10.0 * 180.0 - 90.0
-                    let radian = angle * .pi / 180.0
-                    let isMain = tick % 2 == 0
-                    
-                    Path { path in
-                        let startRadius = geometry.size.width / 2 - 25
-                        let endRadius = geometry.size.width / 2 - (isMain ? 15 : 20)
-                        
-                        path.move(to: CGPoint(
-                            x: center.x + cos(radian) * startRadius,
-                            y: center.y + sin(radian) * startRadius
-                        ))
-                        path.addLine(to: CGPoint(
-                            x: center.x + cos(radian) * endRadius,
-                            y: center.y + sin(radian) * endRadius
-                        ))
-                    }
-                    .stroke(Color.gray.opacity(isMain ? 0.8 : 0.4), lineWidth: isMain ? 2 : 1)
-                }
+                // 눈금을 별도 뷰로 분리
+                TickMarksView(center: center, baseRadius: baseRadius)
                 
-                // 바늘
-                let needleAngle = -90 + value * 180
-                let needleRadian = needleAngle * .pi / 180
-                
-                Path { path in
-                    path.move(to: center)
-                    path.addLine(to: CGPoint(
-                        x: center.x + cos(needleRadian) * (geometry.size.width / 2 - 30),
-                        y: center.y + sin(needleRadian) * (geometry.size.width / 2 - 30)
-                    ))
-                }
-                .stroke(
-                    thresholds.last(where: { currentValue >= $0.value })?.color ?? .blue,
-                    style: StrokeStyle(lineWidth: 3, lineCap: .round)
-                )
+                // 바늘을 별도 뷰로 분리
+                NeedleView(center: center, radian: needleRadian, length: baseRadius - 30, color: needleColor)
                 
                 // 중심점
                 Circle()
@@ -432,6 +414,72 @@ struct SpeedometerGaugeView: View {
                     .position(center)
             }
         }
+    }
+}
+
+// 눈금 뷰 컴포넌트
+struct TickMarksView: View {
+    let center: CGPoint
+    let baseRadius: CGFloat
+    
+    var body: some View {
+        ForEach(0..<11, id: \.self) { tick in
+            TickMark(tick: tick, center: center, baseRadius: baseRadius)
+        }
+    }
+}
+
+// 개별 눈금 마크
+struct TickMark: View {
+    let tick: Int
+    let center: CGPoint
+    let baseRadius: CGFloat
+    
+    var angle: Double {
+        Double(tick) / 10.0 * 180.0 - 90.0
+    }
+    
+    var radian: Double {
+        angle * .pi / 180.0
+    }
+    
+    var isMain: Bool {
+        tick % 2 == 0
+    }
+    
+    var body: some View {
+        Path { path in
+            let startRadius = baseRadius - 25
+            let endRadius = baseRadius - (isMain ? 15 : 20)
+            
+            let startX = center.x + cos(radian) * startRadius
+            let startY = center.y + sin(radian) * startRadius
+            let endX = center.x + cos(radian) * endRadius
+            let endY = center.y + sin(radian) * endRadius
+            
+            path.move(to: CGPoint(x: startX, y: startY))
+            path.addLine(to: CGPoint(x: endX, y: endY))
+        }
+        .stroke(Color.gray.opacity(isMain ? 0.8 : 0.4), lineWidth: isMain ? 2 : 1)
+    }
+}
+
+// 바늘 뷰 컴포넌트
+struct NeedleView: View {
+    let center: CGPoint
+    let radian: Double
+    let length: CGFloat
+    let color: Color
+    
+    var body: some View {
+        Path { path in
+            let endX = center.x + cos(radian) * length
+            let endY = center.y + sin(radian) * length
+            
+            path.move(to: center)
+            path.addLine(to: CGPoint(x: endX, y: endY))
+        }
+        .stroke(color, style: StrokeStyle(lineWidth: 3, lineCap: .round))
     }
 }
 

@@ -15,7 +15,7 @@ struct PolarChartView: View {
         let colors = [Color.blue, Color.purple, Color.orange]
         
         for (index, category) in categories.enumerated() {
-            for angle in stride(from: 0, to: 360, by: 5) {
+            for angle in stride(from: 0.0, to: 360.0, by: 5.0) {
                 let radian = angle * .pi / 180
                 
                 // 각 카테고리별 다른 패턴
