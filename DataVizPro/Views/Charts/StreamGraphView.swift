@@ -127,11 +127,10 @@ struct StreamGraphView: View {
                         
                         Spacer()
                         
-                        if let total = streamData.filter({ $0.series == selected }).map({ $0.value }).reduce(0, +) {
-                            Text("총 \(Int(total))")
-                                .font(.caption)
-                                .bold()
-                        }
+                        let total = streamData.filter { $0.series == selected }.map { $0.value }.reduce(0, +)
+                        Text("총 \(Int(total))")
+                            .font(.caption)
+                            .bold()
                     }
                     .padding()
                     .background(colorForSeries(selected).opacity(0.1))

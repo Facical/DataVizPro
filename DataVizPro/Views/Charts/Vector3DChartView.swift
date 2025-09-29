@@ -127,6 +127,8 @@ struct Vector3DChartView: View {
                 .onTapGesture { location in
                     // 가장 가까운 벡터 선택
                     let tappedPoint = CGPoint(x: location.x, y: location.y)
+                    let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
+                    let scale = min(geometry.size.width, geometry.size.height) / 6 * zoomLevel
                     selectedVector = findNearestVector(at: tappedPoint, center: center, scale: scale)
                 }
             }

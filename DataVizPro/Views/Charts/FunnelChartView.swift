@@ -255,7 +255,7 @@ struct CurvedFunnelView: View {
             for (index, stage) in data.enumerated() {
                 let y = CGFloat(index) * segmentHeight
                 let topWidth = size.width * (stage.value / (data.first?.value ?? 1)) * animationProgress
-                let bottomWidth = index < data.count - 1 
+                let bottomWidth = index < data.count - 1
                     ? size.width * (data[index + 1].value / (data.first?.value ?? 1)) * animationProgress
                     : topWidth * 0.3
                 
@@ -280,14 +280,16 @@ struct CurvedFunnelView: View {
                 
                 path.closeSubpath()
                 
-                // 그라데이션 채우기
-                let gradient = LinearGradient(
-                    colors: [stage.color, stage.color.opacity(0.7)],
-                    startPoint: .top,
-                    endPoint: .bottom
+                // 그라데이션 채우기 (Canvas용)
+                let gradient = Gradient(colors: [stage.color, stage.color.opacity(0.7)])
+                context.fill(
+                    path,
+                    with: .linearGradient(
+                        gradient,
+                        startPoint: CGPoint(x: size.width / 2, y: y),
+                        endPoint: CGPoint(x: size.width / 2, y: y + segmentHeight)
+                    )
                 )
-                
-                context.fill(path, with: .linearGradient(gradient, startPoint: .top, endPoint: .bottom))
                 
                 if selectedStage?.id == stage.id {
                     context.stroke(path, with: .color(.white), lineWidth: 3)
