@@ -80,13 +80,27 @@ struct HistogramChartView: View {
     // 정규분포 곡선 데이터
     var normalCurveData: [(x: Double, y: Double)] {
         let values = generateValues()
-        let mean = values.reduce(0, +) / Double(values.count)
-        let variance = values.map { pow($0 - mean, 2) }.reduce(0, +) / Double(values.count)
+        let count = Double(values.count)
+        let mean = values.reduce(0, +) / count
+        let variance = values.map { pow($0 - mean, 2) }.reduce(0, +) / count
         let stdDev = sqrt(variance)
         
         return stride(from: 0, to: 100, by: 1).map { x in
-            let y = (1 / (stdDev * sqrt(2 * .pi))) * exp(-0.5 * pow((x - mean) / stdDev, 2))
-            return (x, y * Double(values.count) * 100 / Double(binCount)) // 스케일 조정
+            // 복잡한 계산을 여러 단계로 분해
+            let xDiff = x - mean
+            let xNorm = xDiff / stdDev
+            let exponent = -0.5 * xNorm * xNorm
+            let expValue = exp(exponent)
+            
+            let sqrtTwoPi = sqrt(2.0 * .pi)
+            let normalizer = 1.0 / (stdDev * sqrtTwoPi)
+            let y = normalizer * expValue
+            
+            // 스케일 조정
+            let scaleFactor = count * 100.0 / Double(binCount)
+            let scaledY = y * scaleFactor
+            
+            return (x, scaledY)
         }
     }
     
@@ -107,7 +121,10 @@ struct HistogramChartView: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        // 통계 정보를 한 번만 계산
+        let stats = statistics
+        
+        return VStack(alignment: .leading, spacing: 20) {
             // 헤더
             VStack(alignment: .leading, spacing: 8) {
                 Text("히스토그램")
@@ -120,9 +137,9 @@ struct HistogramChartView: View {
                 
                 // 통계 정보 표시
                 HStack(spacing: 20) {
-                    StatisticBadge(label: "평균", value: String(format: "%.1f", statistics.mean))
-                    StatisticBadge(label: "중앙값", value: String(format: "%.1f", statistics.median))
-                    StatisticBadge(label: "표준편차", value: String(format: "%.1f", statistics.stdDev))
+                    StatisticBadge(label: "평균", value: String(format: "%.1f", stats.mean))
+                    StatisticBadge(label: "중앙값", value: String(format: "%.1f", stats.median))
+                    StatisticBadge(label: "표준편차", value: String(format: "%.1f", stats.stdDev))
                     
                     Spacer()
                     
@@ -186,7 +203,7 @@ struct HistogramChartView: View {
                 
                 // 평균선
                 RuleMark(
-                    x: .value("평균", statistics.mean)
+                    x: .value("평균", stats.mean)
                 )
                 .foregroundStyle(.green)
                 .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 5]))
@@ -198,7 +215,7 @@ struct HistogramChartView: View {
                 
                 // 중앙값선
                 RuleMark(
-                    x: .value("중앙값", statistics.median)
+                    x: .value("중앙값", stats.median)
                 )
                 .foregroundStyle(.orange)
                 .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 5]))
