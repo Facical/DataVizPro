@@ -16,27 +16,34 @@ struct HistogramChartView: View {
         case skewed = "치우친 분포"
     }
     
-    // 히스토그램 데이터 생성
+    // 히스토그램 데이터 생성 - 단순화
     var histogramData: [HistogramData] {
         let values = generateValues()
-        let min = values.min() ?? 0
-        let max = values.max() ?? 100
-        let binWidth = (max - min) / Double(binCount)
+        guard !values.isEmpty else { return [] }
+        
+        let minValue = values.min() ?? 0
+        let maxValue = values.max() ?? 100
+        let range = maxValue - minValue
+        
+        guard range > 0, binCount > 0 else { return [] }
+        
+        let binWidth = range / Double(binCount)
         
         var bins: [HistogramData] = []
+        bins.reserveCapacity(binCount)
         
         for i in 0..<binCount {
-            let rangeStart = min + Double(i) * binWidth
+            let rangeStart = minValue + Double(i) * binWidth
             let rangeEnd = rangeStart + binWidth
-            let range = rangeStart...rangeEnd
+            let binRange = rangeStart...rangeEnd
             
-            let frequency = values.filter { range.contains($0) }.count
-            let normalizedFreq = Double(frequency) / Double(values.count)
+            let frequency = values.filter { binRange.contains($0) }.count
+            let normalizedFreq = values.isEmpty ? 0 : Double(frequency) / Double(values.count)
             
             bins.append(HistogramData(
                 bin: String(format: "%.0f-%.0f", rangeStart, rangeEnd),
                 frequency: frequency,
-                range: range,
+                range: binRange,
                 normalizedFrequency: normalizedFreq
             ))
         }
@@ -52,11 +59,11 @@ struct HistogramChartView: View {
         case .normal:
             // Box-Muller 변환을 사용한 정규분포
             return (0..<1000).map { _ in
-                let u1 = Double.random(in: 0...1)
+                let u1 = max(0.0001, Double.random(in: 0...1)) // log(0) 방지
                 let u2 = Double.random(in: 0...1)
                 let z = sqrt(-2 * log(u1)) * cos(2 * .pi * u2)
-                return 50 + z * 15 // 평균 50, 표준편차 15
-            }.map { max(0, min(100, $0)) } // 0-100 범위로 제한
+                return max(0, min(100, 50 + z * 15)) // 0-100 범위로 제한
+            }
             
         case .bimodal:
             // 두 개의 정규분포 혼합
@@ -77,110 +84,67 @@ struct HistogramChartView: View {
         }
     }
     
-    // 정규분포 곡선 데이터
+    // 정규분포 곡선 데이터 - 단순화
     var normalCurveData: [(x: Double, y: Double)] {
         let values = generateValues()
+        guard !values.isEmpty else { return [] }
+        
         let count = Double(values.count)
         let mean = values.reduce(0, +) / count
         let variance = values.map { pow($0 - mean, 2) }.reduce(0, +) / count
-        let stdDev = sqrt(variance)
+        let stdDev = max(0.1, sqrt(variance)) // 0 방지
         
-        // stride를 먼저 Array로 변환하여 타입 추론 부담 감소
-        let xValues: [Double] = Array(stride(from: 0, to: 100, by: 1))
-        
-        // map 대신 별도의 배열 생성
         var result: [(x: Double, y: Double)] = []
-        result.reserveCapacity(xValues.count)
         
-        for x in xValues {
-            // 각 계산을 개별 변수로 분리
-            let xDiff: Double = x - mean
-            let xNorm: Double = xDiff / stdDev
-            let exponent: Double = -0.5 * xNorm * xNorm
-            let expValue: Double = exp(exponent)
-            
-            let sqrtTwoPi: Double = sqrt(2.0 * .pi)
-            let normalizer: Double = 1.0 / (stdDev * sqrtTwoPi)
-            let y: Double = normalizer * expValue
-            
-            // 스케일 조정
-            let binCountDouble: Double = Double(binCount)
-            let scaleFactor: Double = count * 100.0 / binCountDouble
-            let scaledY: Double = y * scaleFactor
-            
+        for x in stride(from: 0.0, through: 100.0, by: 2.0) {
+            let xDiff = x - mean
+            let xNorm = xDiff / stdDev
+            let y = exp(-0.5 * xNorm * xNorm) / (stdDev * sqrt(2.0 * .pi))
+            let scaledY = y * count * 100.0 / Double(max(binCount, 1))
             result.append((x: x, y: scaledY))
         }
         
         return result
     }
     
-    // 통계 정보
+    // 통계 정보 - 단순화
     var statistics: (mean: Double, median: Double, mode: Double, stdDev: Double) {
         let values = generateValues()
+        guard !values.isEmpty else {
+            return (mean: 0, median: 0, mode: 0, stdDev: 0)
+        }
+        
         let count = Double(values.count)
+        let mean = values.reduce(0, +) / count
         
-        // 평균 계산
-        let sum = values.reduce(0, +)
-        let mean = sum / count
-        
-        // 중앙값 계산
         let sortedValues = values.sorted()
-        let middleIndex = sortedValues.count / 2
-        let median = sortedValues[middleIndex]
+        let median = sortedValues[sortedValues.count / 2]
         
-        // 최빈값 계산 (가장 빈번한 구간의 중간값)
         let maxFrequencyBin = histogramData.max(by: { $0.frequency < $1.frequency })
         let mode = maxFrequencyBin?.range.lowerBound ?? 0
         
-        // 표준편차 계산
-        var squaredDiffs: [Double] = []
-        squaredDiffs.reserveCapacity(values.count)
-        for value in values {
-            let diff = value - mean
-            squaredDiffs.append(diff * diff)
-        }
-        let variance = squaredDiffs.reduce(0, +) / count
+        let variance = values.map { pow($0 - mean, 2) }.reduce(0, +) / count
         let stdDev = sqrt(variance)
         
         return (mean: mean, median: median, mode: mode, stdDev: stdDev)
     }
     
     var body: some View {
-        // 통계 정보를 한 번만 계산
-        let stats = statistics
-        
-        return VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 20) {
             // 헤더
-            headerView(stats: stats)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("히스토그램")
+                    .font(.title2)
+                    .bold()
+                
+                Text("데이터 분포 분석")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal)
             
-            // 메인 히스토그램
-            chartView(stats: stats)
-            
-            // 데이터 소스 선택
-            dataSourcePicker
-            
-            // 빈 개수 조절
-            binCountControl
-            
-            // 컨트롤
-            controlsView
-        }
-    }
-    
-    // MARK: - View Components
-    
-    @ViewBuilder
-    private func headerView(stats: (mean: Double, median: Double, mode: Double, stdDev: Double)) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("히스토그램")
-                .font(.title2)
-                .bold()
-            
-            Text("데이터 분포 분석")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-            
-            // 통계 정보 표시
+            // 통계 정보
+            let stats = statistics
             HStack(spacing: 20) {
                 StatisticBadge(label: "평균", value: String(format: "%.1f", stats.mean))
                 StatisticBadge(label: "중앙값", value: String(format: "%.1f", stats.median))
@@ -189,245 +153,146 @@ struct HistogramChartView: View {
                 Spacer()
                 
                 if let selected = selectedBin {
-                    selectedBinView(selected: selected)
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("선택된 구간")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Text("\(selected.bin)")
+                            .font(.caption)
+                            .bold()
+                        Text("빈도: \(selected.frequency)")
+                            .font(.caption2)
+                    }
+                    .padding(8)
+                    .background(Color.blue.opacity(0.1))
+                    .cornerRadius(6)
                 }
             }
-        }
-        .padding(.horizontal)
-    }
-    
-    @ViewBuilder
-    private func selectedBinView(selected: HistogramData) -> some View {
-        VStack(alignment: .trailing, spacing: 2) {
-            Text("선택된 구간")
-                .font(.caption2)
-                .foregroundColor(.secondary)
-            Text("\(selected.bin)")
-                .font(.caption)
-                .bold()
-            Text("빈도: \(selected.frequency)")
-                .font(.caption2)
-        }
-        .padding(8)
-        .background(Color.blue.opacity(0.1))
-        .cornerRadius(6)
-    }
-    
-    @ViewBuilder
-    private func chartView(stats: (mean: Double, median: Double, mode: Double, stdDev: Double)) -> some View {
-        Chart {
-            // 히스토그램 막대
-            histogramBars()
+            .padding(.horizontal)
             
-            // 정규분포 곡선
-            if showNormalCurve {
-                normalCurveLine()
-            }
-            
-            // 평균선
-            averageLine(mean: stats.mean)
-            
-            // 중앙값선
-            medianLine(median: stats.median)
-        }
-        .frame(height: 350)
-        .chartXAxis {
-            AxisMarks(values: .automatic(desiredCount: min(binCount, 10))) { _ in
-                AxisValueLabel(orientation: .vertical)
-                AxisGridLine()
-            }
-        }
-        .chartYAxis {
-            AxisMarks { value in
-                AxisValueLabel()
-                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [3, 3]))
-                    .foregroundStyle(.gray.opacity(0.2))
-            }
-        }
-        .padding()
-        .background(Color.gray.opacity(0.05))
-        .cornerRadius(12)
-        .onAppear {
-            withAnimation(.easeOut(duration: 1.0)) {
-                animationProgress = 1.0
-            }
-        }
-        .gesture(
-            DragGesture()
-                .onEnded { value in
-                    handleDragGesture(value: value)
+            // 차트 - 간단한 버전
+            simpleChartView
+                .frame(height: 350)
+                .padding()
+                .background(Color.gray.opacity(0.05))
+                .cornerRadius(12)
+                .onAppear {
+                    withAnimation(.easeOut(duration: 1.0)) {
+                        animationProgress = 1.0
+                    }
                 }
-        )
-    }
-    
-    @ChartContentBuilder
-    private func histogramBars() -> some ChartContent {
-        ForEach(histogramData) { bin in
-            BarMark(
-                x: .value("구간", bin.bin),
-                y: .value("빈도", Double(bin.frequency) * animationProgress)
-            )
-            .foregroundStyle(barStyle(for: bin))
-            .cornerRadius(2)
-            .annotation(position: .top) {
-                if shouldShowAnnotation(for: bin) {
-                    Text("\(bin.frequency)")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+            
+            // 데이터 소스 선택
+            Picker("데이터 분포", selection: $dataSource) {
+                ForEach(DataSource.allCases, id: \.self) { source in
+                    Text(source.rawValue).tag(source)
                 }
             }
-        }
-    }
-    
-    private func barStyle(for bin: HistogramData) -> LinearGradient {
-        if selectedBin?.id == bin.id {
-            return LinearGradient(
-                colors: [Color.blue, Color.blue],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        } else {
-            return LinearGradient(
-                colors: [Color.blue.opacity(0.8), Color.blue.opacity(0.5)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        }
-    }
-    
-    private func shouldShowAnnotation(for bin: HistogramData) -> Bool {
-        return selectedBin?.id == bin.id && bin.frequency > 0
-    }
-    
-    @ChartContentBuilder
-    private func normalCurveLine() -> some ChartContent {
-        ForEach(normalCurveData, id: \.x) { point in
-            LineMark(
-                x: .value("X", point.x),
-                y: .value("Y", point.y * animationProgress)
-            )
-            .foregroundStyle(.red)
-            .lineStyle(StrokeStyle(lineWidth: 2))
-        }
-        .interpolationMethod(.catmullRom)
-    }
-    
-    @ChartContentBuilder
-    private func averageLine(mean: Double) -> some ChartContent {
-        RuleMark(
-            x: .value("평균", mean)
-        )
-        .foregroundStyle(.green)
-        .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 5]))
-        .annotation(position: .top) {
-            Text("평균")
-                .font(.caption2)
-                .foregroundColor(.green)
-        }
-    }
-    
-    @ChartContentBuilder
-    private func medianLine(median: Double) -> some ChartContent {
-        RuleMark(
-            x: .value("중앙값", median)
-        )
-        .foregroundStyle(.orange)
-        .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 5]))
-        .annotation(position: .bottom) {
-            Text("중앙값")
-                .font(.caption2)
-                .foregroundColor(.orange)
-        }
-    }
-    
-    private func handleDragGesture(value: DragGesture.Value) {
-        // 드래그로 빈 개수 조정
-        if abs(value.translation.width) > 50 {
-            withAnimation {
-                if value.translation.width > 0 {
-                    binCount = min(30, binCount + 2)
-                } else {
-                    binCount = max(5, binCount - 2)
-                }
-                animationProgress = 0
-                withAnimation(.easeOut(duration: 0.5)) {
-                    animationProgress = 1.0
-                }
-            }
-        }
-    }
-    
-    @ViewBuilder
-    private var dataSourcePicker: some View {
-        Picker("데이터 분포", selection: $dataSource) {
-            ForEach(DataSource.allCases, id: \.self) { source in
-                Text(source.rawValue).tag(source)
-            }
-        }
-        .pickerStyle(.segmented)
-        .padding(.horizontal)
-        .onChange(of: dataSource) { _ in
-            animationProgress = 0
-            withAnimation(.easeOut(duration: 0.8)) {
-                animationProgress = 1.0
-            }
-        }
-    }
-    
-    @ViewBuilder
-    private var binCountControl: some View {
-        VStack(spacing: 8) {
-            HStack {
-                Text("구간 개수: \(binCount)")
-                    .font(.caption)
-                
-                Spacer()
-                
-                Text("← 드래그로 조절 →")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
-            
-            Slider(value: Binding(
-                get: { Double(binCount) },
-                set: { binCount = Int($0) }
-            ), in: 5...30, step: 1) {
-                Text("구간")
-            }
-            .onChange(of: binCount) { _ in
-                animationProgress = 0
-                withAnimation(.easeOut(duration: 0.5)) {
-                    animationProgress = 1.0
-                }
-            }
-        }
-        .padding(.horizontal)
-    }
-    
-    @ViewBuilder
-    private var controlsView: some View {
-        HStack {
-            Toggle("정규분포 곡선", isOn: $showNormalCurve)
-            
-            Spacer()
-            
-            Button("데이터 새로고침") {
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+            .onChange(of: dataSource) { _ in
                 animationProgress = 0
                 withAnimation(.easeOut(duration: 0.8)) {
                     animationProgress = 1.0
                 }
             }
-            .buttonStyle(.bordered)
             
-            Button("애니메이션 재생") {
-                animationProgress = 0
-                withAnimation(.easeOut(duration: 1.2)) {
-                    animationProgress = 1.0
+            // 빈 개수 조절
+            VStack(spacing: 8) {
+                HStack {
+                    Text("구간 개수: \(binCount)")
+                        .font(.caption)
+                    
+                    Spacer()
+                    
+                    Text("← 드래그로 조절 →")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                
+                Slider(value: Binding(
+                    get: { Double(binCount) },
+                    set: { binCount = Int($0) }
+                ), in: 5...30, step: 1)
+                .onChange(of: binCount) { _ in
+                    animationProgress = 0
+                    withAnimation(.easeOut(duration: 0.5)) {
+                        animationProgress = 1.0
+                    }
                 }
             }
-            .buttonStyle(.borderedProminent)
+            .padding(.horizontal)
+            
+            // 컨트롤
+            HStack {
+                Toggle("정규분포 곡선", isOn: $showNormalCurve)
+                
+                Spacer()
+                
+                Button("애니메이션 재생") {
+                    animationProgress = 0
+                    withAnimation(.easeOut(duration: 1.2)) {
+                        animationProgress = 1.0
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            .padding(.horizontal)
         }
-        .padding(.horizontal)
+    }
+    
+    // 단순화된 차트 뷰
+    @ViewBuilder
+    private var simpleChartView: some View {
+        Chart {
+            // 히스토그램 막대 (연속형 X축)
+            ForEach(histogramData) { bin in
+                BarMark(
+                    xStart: .value("구간 시작", bin.range.lowerBound),
+                    xEnd: .value("구간 끝", bin.range.upperBound),
+                    y: .value("빈도", Double(bin.frequency) * animationProgress)
+                )
+                .foregroundStyle(
+                    selectedBin?.id == bin.id ? Color.blue : Color.blue.opacity(0.6)
+                )
+                .cornerRadius(2)
+            }
+            
+            // 정규분포 곡선 (옵션)
+            if showNormalCurve && !normalCurveData.isEmpty {
+                ForEach(Array(normalCurveData.enumerated()), id: \.offset) { _, point in
+                    LineMark(
+                        x: .value("X", point.x),
+                        y: .value("Y", point.y * animationProgress)
+                    )
+                    .foregroundStyle(.red)
+                    .lineStyle(StrokeStyle(lineWidth: 2))
+                }
+            }
+            
+            // 평균선
+            if !histogramData.isEmpty {
+                let mean = statistics.mean
+                RuleMark(
+                    x: .value("평균", mean)
+                )
+                .foregroundStyle(.green)
+                .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 5]))
+            }
+        }
+        .chartXAxis {
+            AxisMarks(values: .automatic(desiredCount: min(binCount, 10))) { _ in
+                AxisValueLabel()
+                AxisGridLine()
+            }
+        }
+        .chartYAxis {
+            AxisMarks { _ in
+                AxisValueLabel()
+                AxisGridLine(stroke: StrokeStyle(lineWidth: 0.5, dash: [3, 3]))
+                    .foregroundStyle(.gray.opacity(0.2))
+            }
+        }
     }
 }
 
