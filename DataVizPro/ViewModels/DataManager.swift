@@ -251,11 +251,28 @@ class DataManager: ObservableObject {
         
         for age in stride(from: 0, to: 100, by: 5) {
             for gender in genders {
+                // 안전한 범위의 값으로 제한
+                let count = Int.random(in: 10000...50000)
                 populationData.append(PopulationData(
                     age: age,
-                    count: Int.random(in: 10000...100000),
+                    count: count,
                     gender: gender
                 ))
+            }
+        }
+        
+        // 데이터가 비어있지 않은지 확인
+        if populationData.isEmpty {
+            print("Warning: Population data is empty, generating default data")
+            // 기본 데이터 생성
+            for age in stride(from: 0, to: 100, by: 10) {
+                for gender in genders {
+                    populationData.append(PopulationData(
+                        age: age,
+                        count: 20000,
+                        gender: gender
+                    ))
+                }
             }
         }
     }
