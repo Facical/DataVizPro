@@ -26,7 +26,7 @@ struct ChartSidebarView: View {
     var body: some View {
         List {
             Section("기본 차트") {
-                ForEach([DataManager.ChartType.bar, .line, .area], id: \.self) { chartType in
+                ForEach([DataManager.ChartType.bar, .line, .area, .point, .sector, .rectangle, .rule], id: \.self) { chartType in
                     ChartRowView(chartType: chartType, isSelected: selectedChart == chartType) {
                         selectedChart = chartType
                     }
@@ -34,7 +34,7 @@ struct ChartSidebarView: View {
             }
             
             Section("고급 차트") {
-                ForEach([DataManager.ChartType.point, .sector, .heatMap], id: \.self) { chartType in
+                ForEach([DataManager.ChartType.heatMap, .waterfall, .boxPlot, .violin, .ridgeline, .streamGraph], id: \.self) { chartType in
                     ChartRowView(chartType: chartType, isSelected: selectedChart == chartType) {
                         selectedChart = chartType
                     }
@@ -42,7 +42,39 @@ struct ChartSidebarView: View {
             }
             
             Section("금융 차트") {
-                ForEach([DataManager.ChartType.candlestick, .rangeChart], id: \.self) { chartType in
+                ForEach([DataManager.ChartType.candlestick, .rangeChart, .gantt, .funnel], id: \.self) { chartType in
+                    ChartRowView(chartType: chartType, isSelected: selectedChart == chartType) {
+                        selectedChart = chartType
+                    }
+                }
+            }
+            
+            Section("분석 차트") {
+                ForEach([DataManager.ChartType.pyramid, .histogram, .densityPlot, .correlation, .multiLine, .stackedBar], id: \.self) { chartType in
+                    ChartRowView(chartType: chartType, isSelected: selectedChart == chartType) {
+                        selectedChart = chartType
+                    }
+                }
+            }
+            
+            Section("특수 차트") {
+                ForEach([DataManager.ChartType.polar, .radar, .gauge, .bubbleChart], id: \.self) { chartType in
+                    ChartRowView(chartType: chartType, isSelected: selectedChart == chartType) {
+                        selectedChart = chartType
+                    }
+                }
+            }
+            
+            Section("계층 차트") {
+                ForEach([DataManager.ChartType.treemap, .sunburst], id: \.self) { chartType in
+                    ChartRowView(chartType: chartType, isSelected: selectedChart == chartType) {
+                        selectedChart = chartType
+                    }
+                }
+            }
+            
+            Section("3D 차트") {
+                ForEach([DataManager.ChartType.scatter3D, .surface3D, .vector3D], id: \.self) { chartType in
                     ChartRowView(chartType: chartType, isSelected: selectedChart == chartType) {
                         selectedChart = chartType
                     }
@@ -180,223 +212,106 @@ struct ChartView: View {
             switch chartType {
             // 기본 차트
             case .bar:
-                if !dataManager.salesData.isEmpty {
-                    BarChartView()
-                } else {
-                    EmptyChartView(message: "판매 데이터 로딩 중...")
-                }
+                BarChartView()
                 
             case .line:
-                if !dataManager.stockData.isEmpty {
-                    LineChartView()
-                } else {
-                    EmptyChartView(message: "주식 데이터 로딩 중...")
-                }
+                LineChartView()
                 
             case .area:
-                if !dataManager.multiSeriesData.isEmpty {
-                    AreaChartView()
-                } else {
-                    EmptyChartView(message: "시리즈 데이터 로딩 중...")
-                }
+                AreaChartView()
                 
             case .point:
-                if !dataManager.point3DData.isEmpty {
-                    ScatterPlotView()
-                } else {
-                    EmptyChartView(message: "포인트 데이터 로딩 중...")
-                }
+                ScatterPlotView()
                 
             case .sector:
-                if !dataManager.profitData.isEmpty {
-                    SectorChartView()
-                } else {
-                    EmptyChartView(message: "수익 데이터 로딩 중...")
-                }
+                SectorChartView()
                 
-            // 고급 차트
-            case .heatMap:
-                if !dataManager.heatMapData.isEmpty {
-                    HeatMapChartView()
-                } else {
-                    EmptyChartView(message: "히트맵 데이터 로딩 중...")
-                }
-                
-            case .waterfall:
-                if !dataManager.waterfallData.isEmpty {
-                    WaterfallChartView()
-                } else {
-                    EmptyChartView(message: "워터폴 데이터 로딩 중...")
-                }
-                
-            case .boxPlot:
-                if !dataManager.boxPlotData.isEmpty {
-                    BoxPlotChartView()
-                } else {
-                    EmptyChartView(message: "박스플롯 데이터 로딩 중...")
-                }
-                
-            // 금융 차트
-            case .candlestick:
-                if !dataManager.stockData.isEmpty {
-                    CandlestickChartView()
-                } else {
-                    EmptyChartView(message: "주가 데이터 로딩 중...")
-                }
-                
-            case .rangeChart:
-                if !dataManager.stockData.isEmpty {
-                    RangeChartView()
-                } else {
-                    EmptyChartView(message: "범위 데이터 로딩 중...")
-                }
-                
-            case .gantt:
-                if !dataManager.ganttTasks.isEmpty {
-                    GanttChartView()
-                } else {
-                    EmptyChartView(message: "간트 데이터 로딩 중...")
-                }
-                
-            // 분석 차트
-            case .pyramid:
-                if !dataManager.populationData.isEmpty {
-                    PopulationPyramidView()
-                } else {
-                    EmptyChartView(message: "인구 데이터 로딩 중...")
-                }
-                
-            case .multiLine:
-                if !dataManager.multiSeriesData.isEmpty {
-                    MultiLineChartView()
-                } else {
-                    EmptyChartView(message: "멀티라인 데이터 로딩 중...")
-                }
-                
-            case .stackedBar:
-                if !dataManager.salesData.isEmpty {
-                    StackedBarChartView()
-                } else {
-                    EmptyChartView(message: "누적 막대 데이터 로딩 중...")
-                }
-                
-            case .histogram:
-                if !dataManager.histogramData.isEmpty {
-                    HistogramChartView()
-                } else {
-                    EmptyChartView(message: "히스토그램 데이터 로딩 중...")
-                }
-                
-            case .densityPlot:
-                if !dataManager.densityData.isEmpty {
-                    DensityPlotView()
-                } else {
-                    EmptyChartView(message: "밀도 플롯 데이터 로딩 중...")
-                }
-                
-            case .correlation:
-                if !dataManager.correlationData.isEmpty {
-                    CorrelationMatrixView()
-                } else {
-                    EmptyChartView(message: "상관관계 데이터 로딩 중...")
-                }
-                
-            // 특수 차트
-            case .radar:
-                if !dataManager.radarData.isEmpty {
-                    RadarChartView()
-                } else {
-                    EmptyChartView(message: "레이더 데이터 로딩 중...")
-                }
-                
-            case .gauge:
-                if !dataManager.gaugeData.isEmpty {
-                    GaugeChartView()
-                } else {
-                    EmptyChartView(message: "게이지 데이터 로딩 중...")
-                }
-                
-            case .bubbleChart:
-                if !dataManager.bubbleData.isEmpty {
-                    BubbleChartView()
-                } else {
-                    EmptyChartView(message: "버블 데이터 로딩 중...")
-                }
-                
-            case .funnel:
-                if !dataManager.funnelData.isEmpty {
-                    FunnelChartView()
-                } else {
-                    EmptyChartView(message: "퍼널 데이터 로딩 중...")
-                }
-                
-            // 계층 차트
-            case .treemap:
-                if !dataManager.treemapData.isEmpty {
-                    TreemapChartView()
-                } else {
-                    EmptyChartView(message: "트리맵 데이터 로딩 중...")
-                }
-                
-            case .sunburst:
-                if !dataManager.sunburstData.isEmpty {
-                    SunburstChartView()
-                } else {
-                    EmptyChartView(message: "선버스트 데이터 로딩 중...")
-                }
-                
-            // 3D 차트
-            case .scatter3D:
-                if !dataManager.point3DEnhanced.isEmpty {
-                    Scatter3DChartView()
-                } else {
-                    EmptyChartView(message: "3D 산점도 데이터 로딩 중...")
-                }
-                
-            case .surface3D:
-                if !dataManager.surface3DData.isEmpty {
-                    Surface3DChartView()
-                } else {
-                    EmptyChartView(message: "3D 표면 데이터 로딩 중...")
-                }
-                
-            case .vector3D:
-                if !dataManager.vector3DData.isEmpty {
-                    Vector3DChartView()
-                } else {
-                    EmptyChartView(message: "3D 벡터 데이터 로딩 중...")
-                }
-                
-            // 추가 고급 차트
-            case .violin:
-                if !dataManager.violinPlotData.isEmpty {
-                    ViolinPlotView()
-                } else {
-                    EmptyChartView(message: "바이올린 플롯 데이터 로딩 중...")
-                }
-                
-            case .ridgeline:
-                RidgelineChartView()
-                
-            case .streamGraph:
-                if !dataManager.streamGraphData.isEmpty {
-                    StreamGraphView()
-                } else {
-                    EmptyChartView(message: "스트림 그래프 데이터 로딩 중...")
-                }
-                
-            case .polar:
-                PolarChartView()
-                
-            // 기본 차트 타입들
             case .rectangle:
                 RectangleChartView()
                 
             case .rule:
                 RuleChartView()
                 
-            default:
-                EmptyChartView(message: "차트를 준비 중입니다...")
+            // 고급 차트
+            case .heatMap:
+                HeatMapChartView()
+                
+            case .waterfall:
+                WaterfallChartView()
+                
+            case .boxPlot:
+                BoxPlotChartView()
+                
+            case .violin:
+                ViolinPlotView()
+                
+            case .ridgeline:
+                RidgelineChartView()
+                
+            case .streamGraph:
+                StreamGraphView()
+                
+            // 금융 차트
+            case .candlestick:
+                CandlestickChartView()
+                
+            case .rangeChart:
+                RangeChartView()
+                
+            case .gantt:
+                GanttChartView()
+                
+            case .funnel:
+                FunnelChartView()
+                
+            // 분석 차트
+            case .pyramid:
+                PopulationPyramidView()
+                
+            case .multiLine:
+                MultiLineChartView()
+                
+            case .stackedBar:
+                StackedBarChartView()
+                
+            case .histogram:
+                HistogramChartView()
+                
+            case .densityPlot:
+                DensityPlotView()
+                
+            case .correlation:
+                CorrelationMatrixView()
+                
+            // 특수 차트
+            case .radar:
+                RadarChartView()
+                
+            case .gauge:
+                GaugeChartView()
+                
+            case .bubbleChart:
+                BubbleChartView()
+                
+            case .polar:
+                PolarChartView()
+                
+            // 계층 차트
+            case .treemap:
+                TreemapChartView()
+                
+            case .sunburst:
+                SunburstChartView()
+                
+            // 3D 차트
+            case .scatter3D:
+                Scatter3DChartView()
+                
+            case .surface3D:
+                Surface3DChartView()
+                
+            case .vector3D:
+                Vector3DChartView()
             }
         }
         .frame(maxWidth: .infinity)
